@@ -1,0 +1,17 @@
+[project]
+name = "comfyui-clarkairsana"
+description = "Run Clark Air Sana 1.6B (ternary ~1.58-bit, GemLite INT2 kernels) natively under ComfyUI's KSampler."
+version = "1.0.0"
+license = { text = "Apache-2.0" }
+requires-python = ">=3.10"
+dependencies = ["gemlite", "safetensors", "numpy"]
+
+[project.urls]
+Repository = "https://github.com/clark-labs-inc/ComfyUI-ClarkAirSana"
+
+[tool.comfy]
+# Set PublisherId to your registry.comfy.org publisher handle before `comfy node publish`.
+PublisherId = "clark-labs"
+DisplayName = "ComfyUI-ClarkAirSana"
+Icon = ""
+includes = []

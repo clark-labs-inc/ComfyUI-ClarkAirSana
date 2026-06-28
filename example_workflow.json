@@ -1,0 +1,41 @@
+{
+  "1": {
+    "class_type": "GemmaLoader",
+    "inputs": { "model_name": "unsloth/gemma-2-2b-it-bnb-4bit", "device": "cuda", "dtype": "bfloat16" }
+  },
+  "2": {
+    "class_type": "GemmaTextEncode",
+    "inputs": { "text": "a corgi astronaut floating in space, photorealistic, 8k", "GEMMA": ["1", 0] }
+  },
+  "3": {
+    "class_type": "GemmaTextEncode",
+    "inputs": { "text": "", "GEMMA": ["1", 0] }
+  },
+  "4": {
+    "class_type": "ClarkAirSanaLoader",
+    "inputs": { "pack_name": "clark_air_sana_gemlite_comfy.safetensors", "model_variant": "SanaMS_1600M_P1_D20", "dtype": "bfloat16" }
+  },
+  "5": {
+    "class_type": "EmptySanaLatentImage",
+    "inputs": { "width": 512, "height": 512, "batch_size": 1 }
+  },
+  "6": {
+    "class_type": "KSampler",
+    "inputs": {
+      "model": ["4", 0], "positive": ["2", 0], "negative": ["3", 0], "latent_image": ["5", 0],
+      "seed": 9000, "steps": 20, "cfg": 4.5, "sampler_name": "euler", "scheduler": "normal", "denoise": 1.0
+    }
+  },
+  "7": {
+    "class_type": "ExtraVAELoader",
+    "inputs": { "vae_name": "mit-han-lab/dc-ae-f32c32-sana-1.1-diffusers", "vae_type": "dcae-f32c32-sana-1.1-diffusers", "dtype": "bfloat16" }
+  },
+  "8": {
+    "class_type": "VAEDecode",
+    "inputs": { "samples": ["6", 0], "vae": ["7", 0] }
+  },
+  "9": {
+    "class_type": "SaveImage",
+    "inputs": { "images": ["8", 0], "filename_prefix": "ClarkAirSana" }
+  }
+}
