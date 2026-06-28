@@ -15,21 +15,24 @@ layers (~0.5 GB), leaving the small "island" layers in bf16.
 
 ## Install
 
+**Easiest — ComfyUI-Manager:** open the Manager, search **Clark Air Sana**, and click Install.
+Also install **ComfyUI ExtraModels** (it provides the Gemma text encoder and DC-AE VAE). Restart
+ComfyUI.
+
+**Or manually:**
+
 ```
 cd ComfyUI/custom_nodes
-git clone https://github.com/lawrence-cj/ComfyUI_ExtraModels   # if not already present
-git clone <this repo> ComfyUI-ClarkAirSana
+git clone https://github.com/lawrence-cj/ComfyUI_ExtraModels
+git clone https://github.com/clark-labs-inc/ComfyUI-ClarkAirSana
 pip install -r ComfyUI-ClarkAirSana/requirements.txt
 ```
 
-Download the transformer pack into `ComfyUI/models/clark_air_sana/`:
+**Get the model:** make a folder `ComfyUI/models/clark_air_sana/` and download this one file into it:
 
-```
-huggingface-cli download clark-labs/clark-air-sana-1.6b-gemlite-2bit \
-  clark_air_sana_gemlite_comfy.safetensors --local-dir ComfyUI/models/clark_air_sana
-```
+> [clark_air_sana_gemlite_comfy.safetensors](https://huggingface.co/clark-labs/clark-air-sana-1.6b-gemlite-2bit/resolve/main/clark_air_sana_gemlite_comfy.safetensors) (495 MB)
 
-`GemmaLoader` fetches the text encoder and `ExtraVAELoader` the DC-AE VAE on first run.
+The Gemma text encoder and DC-AE VAE download by themselves the first time you run the workflow.
 
 **Footprint (~3.2 GB total).** The example workflow defaults to the small components:
 
@@ -39,19 +42,22 @@ huggingface-cli download clark-labs/clark-air-sana-1.6b-gemlite-2bit \
 | Gemma text encoder | **~2.1 GB** | `unsloth/gemma-2-2b-it-bnb-4bit` (4-bit). Swap to `Efficient-Large-Model/gemma-2-2b-it` for fp16 (9.8 GB) if you prefer. |
 | DC-AE VAE | 1.2 GB (fp32) | loaded in bf16 at runtime; drop a bf16 copy (624 MB) at the VAE path to halve the download. |
 
-## Graph
+## Workflow
+
+Download **[`example_workflow.json`](example_workflow.json)** and drag it onto the ComfyUI canvas
+(or Workflow → Open), then press **Queue**. That is the whole graph, ready to run:
 
 ```
 GemmaLoader ─┬─ GemmaTextEncode (positive) ─┐
              └─ GemmaTextEncode (negative) ─┤
 ClarkAirSanaLoader ──────── MODEL ──────────┼─ KSampler ─ VAEDecode ─ SaveImage
 ExtraVAELoader (dcae-f32c32-sana) ── VAE ────┘     │
-EmptySanaLatentImage ───────── LATENT ─────────────┘
+ClarkAirSanaEmptyLatent ──────── LATENT ───────────┘
 ```
 
-KSampler: **`euler` / `normal`, 20 steps, cfg 4.5, 512×512** (verified end-to-end). See
-`example_workflow.json` (API format). The trunk runs on real GemLite INT2 kernels — identical
-math to the standalone render.
+KSampler: **`euler` / `normal`, 20 steps, cfg 4.5, 512×512** (verified end-to-end through
+ComfyUI's KSampler). The trunk runs on real GemLite INT2 kernels. `example_workflow_api.json` is
+the same graph in API format for scripting.
 
 ![demo](demo.png)
 

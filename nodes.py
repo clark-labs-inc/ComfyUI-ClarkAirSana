@@ -78,5 +78,38 @@ class ClarkAirSanaLoader:
         return (patcher,)
 
 
-NODE_CLASS_MAPPINGS = {"ClarkAirSanaLoader": ClarkAirSanaLoader}
-NODE_DISPLAY_NAME_MAPPINGS = {"ClarkAirSanaLoader": "Clark Air Sana Loader (GemLite INT2)"}
+class ClarkAirSanaEmptyLatent:
+    """A 32-channel (DC-AE) empty latent for Sana. Self-contained so the workflow does not
+    depend on ExtraModels' EmptySanaLatentImage, which breaks on current ComfyUI."""
+
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "width": ("INT", {"default": 512, "min": 128, "max": 4096, "step": 32}),
+                "height": ("INT", {"default": 512, "min": 128, "max": 4096, "step": 32}),
+                "batch_size": ("INT", {"default": 1, "min": 1, "max": 64}),
+            }
+        }
+
+    RETURN_TYPES = ("LATENT",)
+    FUNCTION = "generate"
+    CATEGORY = "ClarkAir/Sana"
+    TITLE = "Clark Air Sana Empty Latent"
+
+    def generate(self, width, height, batch_size=1):
+        latent = torch.zeros(
+            [batch_size, 32, height // 32, width // 32],
+            device=comfy.model_management.intermediate_device(),
+        )
+        return ({"samples": latent},)
+
+
+NODE_CLASS_MAPPINGS = {
+    "ClarkAirSanaLoader": ClarkAirSanaLoader,
+    "ClarkAirSanaEmptyLatent": ClarkAirSanaEmptyLatent,
+}
+NODE_DISPLAY_NAME_MAPPINGS = {
+    "ClarkAirSanaLoader": "Clark Air Sana Loader (GemLite INT2)",
+    "ClarkAirSanaEmptyLatent": "Clark Air Sana Empty Latent",
+}
