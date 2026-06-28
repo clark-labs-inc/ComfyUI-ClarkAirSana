@@ -10,8 +10,7 @@ dependencies = ["gemlite", "safetensors", "numpy"]
 Repository = "https://github.com/clark-labs-inc/ComfyUI-ClarkAirSana"
 
 [tool.comfy]
-# Set PublisherId to your registry.comfy.org publisher handle before `comfy node publish`.
-PublisherId = "clark-labs"
+PublisherId = "clark"
 DisplayName = "ComfyUI-ClarkAirSana"
 Icon = ""
 includes = []

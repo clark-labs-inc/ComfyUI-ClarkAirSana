@@ -23,20 +23,30 @@ def reference_quant_modules(num_layers):
 
 
 def unpack2b(packed, out, inn):  # uint8 [out, in/4] -> ternary int8 [out, in]
-    b = packed.astype(np.uint8); lev = np.empty((out, inn), np.int8)
-    lev[:, 0::4] = b & 3; lev[:, 1::4] = (b >> 2) & 3; lev[:, 2::4] = (b >> 4) & 3; lev[:, 3::4] = (b >> 6) & 3
+    b = packed.astype(np.uint8)
+    lev = np.empty((out, inn), np.int8)
+    lev[:, 0::4] = b & 3
+    lev[:, 1::4] = (b >> 2) & 3
+    lev[:, 2::4] = (b >> 4) & 3
+    lev[:, 3::4] = (b >> 6) & 3
     return lev.astype(np.int8) - 1
 
 
 class _GemliteLin(nn.Module):
-    def __init__(self, gl): super().__init__(); self.gl = gl
+    def __init__(self, gl):
+        super().__init__()
+        self.gl = gl
+
     def forward(self, x):
         s = x.shape
         return self.gl(x.reshape(-1, s[-1]).half()).reshape(*s[:-1], -1).to(x.dtype)
 
 
 class _GemliteConv1x1(nn.Module):  # 1x1 conv as a channel matmul
-    def __init__(self, gl): super().__init__(); self.gl = gl
+    def __init__(self, gl):
+        super().__init__()
+        self.gl = gl
+
     def forward(self, x):
         b, c, h, w = x.shape
         y = self.gl(x.permute(0, 2, 3, 1).reshape(-1, c).half())
@@ -60,7 +70,8 @@ def inject_gemlite(model, pack, dtype, device, num_layers=20):
         out_, inn_ = [int(x) for x in pack[ref + "::shape"].tolist()]
         code = unpack2b(pack[ref + "::codes2b"].numpy(), out_, inn_)
         scale = pack[ref + "::scale"].float()
-        ng = scale.shape[1]; g = inn_ // ng
+        ng = scale.shape[1]
+        g = inn_ // ng
         wq = torch.from_numpy((code + 1).astype(np.uint8)).to(device)
         bias = pack.get(ref + ".bias")
         gl = GemLiteLinear(W_nbits=2, group_size=g, in_features=inn_, out_features=out_,
