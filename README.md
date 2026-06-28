@@ -7,14 +7,21 @@ layers (~0.5 GB), leaving the small "island" layers in bf16.
 
 ## Quick start
 
-1. In **ComfyUI-Manager**, install **Clark Air Sana** and **ComfyUI ExtraModels**, then restart ComfyUI.
+1. In **ComfyUI-Manager**:
+   - install **Clark Air Sana** (it's in the search list), and
+   - install **ComfyUI_ExtraModels** with **Install via Git URL** → `https://github.com/lawrence-cj/ComfyUI_ExtraModels`
+     (this Sana-capable fork isn't in the Manager search; its VAE loader is the one this workflow
+     uses). Restart ComfyUI.
 2. **Download the model** → put it in `ComfyUI/models/clark_air_sana/`:
    **[clark_air_sana_gemlite_comfy.safetensors](https://huggingface.co/clark-labs/clark-air-sana-1.6b-gemlite-2bit/resolve/main/clark_air_sana_gemlite_comfy.safetensors)** (495 MB).
 3. **⬇ Download the workflow:** **[example_workflow.json](https://github.com/clark-labs-inc/ComfyUI-ClarkAirSana/raw/main/example_workflow.json)** → drag it onto the ComfyUI canvas → press **Queue**.
 
-(Gemma + the DC-AE VAE download themselves on the first run.) If you installed an older version and
-see a `dtype 'bfloat16' not in [...]` error, update the node in ComfyUI-Manager and re-open the
-workflow — or just set the **GemmaLoader** and **ExtraVAELoader** `dtype` dropdowns to **BF16**.
+(Gemma + the DC-AE VAE download themselves on the first run.)
+
+**On older versions** you may see `dtype 'bfloat16' not in [...]` or an `EmptySanaLatentImage`
+`AttributeError`. Both are fixed in the current release: **update Clark Air Sana in ComfyUI-Manager
+and re-open `example_workflow.json`** (it now uses `BF16` and our own `ClarkAirSanaEmptyLatent`
+instead of the broken Empty Sana Latent node).
 
 ## Requirements
 
