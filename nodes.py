@@ -1,16 +1,13 @@
-"""ComfyUI-ClarkAirSana — load the GemLite INT2 (ternary ~1.58-bit) Sana 1.6B transformer as a
-native ComfyUI MODEL, driven by the standard KSampler.
+"""ComfyUI-ClarkAirSana — self-contained nodes for Clark Air Sana 1.6B (ternary ~1.58-bit,
+GemLite INT2). No external custom-node dependency: the Sana skeleton, the Gemma text encoder,
+and the DC-AE VAE are all provided here. CUDA + gemlite required.
 
-Builds ComfyUI_ExtraModels' SanaMS skeleton, then replaces its attention + GLU-FFN trunk with
-GemLite INT2 kernels (gemlite_inject). Pair it with ExtraModels' GemmaLoader/GemmaTextEncode +
-ExtraVAELoader (dcae-f32c32-sana) + EmptySanaLatentImage. CUDA + gemlite required.
+The Sana model code under `sana/` and the ComfyUI glue (`sana/exm.py`) are vendored from
+ComfyUI_ExtraModels (Apache-2.0) which adapts NVlabs/Sana — see NOTICE.
 """
-import importlib
 import os
-import sys
 
 import torch
-from safetensors.torch import load_file
 
 import folder_paths
 import comfy.model_base
@@ -18,27 +15,19 @@ import comfy.model_management
 import comfy.model_patcher
 
 from .gemlite_inject import inject_gemlite
+from .sana.exm import EXM_Sana, EXM_Sana_Model
+from .sana.conf import sana_conf
+from .sana.sana_multi_scale import SanaMS
 
-
-def _extra_models():
-    """Import ComfyUI_ExtraModels' Sana pieces, ensuring custom_nodes is importable."""
-    cn = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../custom_nodes
-    if cn not in sys.path:
-        sys.path.insert(0, cn)
-    loader = importlib.import_module("ComfyUI_ExtraModels.Sana.loader")
-    conf = importlib.import_module("ComfyUI_ExtraModels.Sana.conf")
-    sms = importlib.import_module("ComfyUI_ExtraModels.Sana.models.sana_multi_scale")
-    return loader.EXM_Sana, loader.EXM_Sana_Model, conf.sana_conf, sms.SanaMS
-
-
-# Models live in ComfyUI/models/clark_air_sana/
 folder_paths.add_model_folder_path(
     "clark_air_sana", os.path.join(folder_paths.models_dir, "clark_air_sana")
 )
 
-_DTYPES = {"bfloat16": torch.bfloat16, "float16": torch.float16}
+_TE_DTYPE = {"BF16": torch.bfloat16, "FP16": torch.float16, "FP32": torch.float32}
+_MODEL_DTYPE = {"bfloat16": torch.bfloat16, "float16": torch.float16}
 
 
+# --------------------------------------------------------------------------- transformer
 class ClarkAirSanaLoader:
     @classmethod
     def INPUT_TYPES(cls):
@@ -56,32 +45,24 @@ class ClarkAirSanaLoader:
     TITLE = "Clark Air Sana Loader (GemLite INT2)"
 
     def load(self, pack_name, model_variant, dtype):
-        EXM_Sana, EXM_Sana_Model, sana_conf, SanaMS = _extra_models()
-        torch_dtype = _DTYPES[dtype]
-        pack = load_file(folder_paths.get_full_path("clark_air_sana", pack_name))
+        from safetensors.torch import load_file
 
+        torch_dtype = _MODEL_DTYPE[dtype]
+        pack = load_file(folder_paths.get_full_path("clark_air_sana", pack_name))
         conf = EXM_Sana(sana_conf[model_variant])
         load_device = comfy.model_management.get_torch_device()
         model = EXM_Sana_Model(conf, model_type=comfy.model_base.ModelType.FLOW, device=load_device)
         model.diffusion_model = SanaMS(**conf.unet_config)
-
         inject_gemlite(model.diffusion_model, pack, torch_dtype, load_device,
                        num_layers=conf.unet_config.get("depth", 20))
         model.diffusion_model.dtype = torch_dtype
         model.diffusion_model.eval()
-
-        # GemLite packed buffers must stay on the GPU — pin the trunk resident by making the
-        # offload device the load device (the ~0.5 GB trunk fits; Gemma/VAE still offload).
-        patcher = comfy.model_patcher.ModelPatcher(
-            model, load_device=load_device, offload_device=load_device
-        )
-        return (patcher,)
+        # GemLite packed buffers must stay on the GPU — pin the trunk resident.
+        return (comfy.model_patcher.ModelPatcher(model, load_device=load_device, offload_device=load_device),)
 
 
+# --------------------------------------------------------------------------- latent
 class ClarkAirSanaEmptyLatent:
-    """A 32-channel (DC-AE) empty latent for Sana. Self-contained so the workflow does not
-    depend on ExtraModels' EmptySanaLatentImage, which breaks on current ComfyUI."""
-
     @classmethod
     def INPUT_TYPES(cls):
         return {
@@ -105,11 +86,115 @@ class ClarkAirSanaEmptyLatent:
         return ({"samples": latent},)
 
 
+# --------------------------------------------------------------------------- gemma text encoder
+class ClarkAirGemmaLoader:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "model_name": (["unsloth/gemma-2-2b-it-bnb-4bit", "Efficient-Large-Model/gemma-2-2b-it"],),
+                "device": (["cuda", "cpu"], {"default": "cuda"}),
+                "dtype": (["BF16", "FP16", "FP32"], {"default": "BF16"}),
+            }
+        }
+
+    RETURN_TYPES = ("CLARKAIR_GEMMA",)
+    FUNCTION = "load"
+    CATEGORY = "ClarkAir/Sana"
+    TITLE = "Clark Air Gemma Loader"
+
+    def load(self, model_name, device, dtype):
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        td = _TE_DTYPE[dtype]
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer.padding_side = "right"
+        model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=td)
+        text_encoder = model.get_decoder()
+        if device != "cpu":
+            text_encoder = text_encoder.to(device)
+        return ({"tokenizer": tokenizer, "text_encoder": text_encoder, "model": model},)
+
+
+class ClarkAirGemmaEncode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"text": ("STRING", {"multiline": True}), "gemma": ("CLARKAIR_GEMMA",)}}
+
+    RETURN_TYPES = ("CONDITIONING",)
+    FUNCTION = "encode"
+    CATEGORY = "ClarkAir/Sana"
+    TITLE = "Clark Air Gemma Encode"
+
+    def encode(self, text, gemma):
+        tokenizer = gemma["tokenizer"]
+        text_encoder = gemma["text_encoder"]
+        with torch.no_grad():
+            tokens = tokenizer(text, max_length=300, padding="max_length", truncation=True,
+                               return_tensors="pt").to(text_encoder.device)
+            cond = text_encoder(tokens.input_ids, tokens.attention_mask)[0]
+            cond = cond * tokens.attention_mask.unsqueeze(-1)
+        return ([[cond, {}]],)
+
+
+# --------------------------------------------------------------------------- DC-AE VAE
+class ClarkAirVAELoader:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {
+            "required": {
+                "vae_name": (["mit-han-lab/dc-ae-f32c32-sana-1.1-diffusers",
+                              "mit-han-lab/dc-ae-f32c32-sana-1.0-diffusers"],),
+            }
+        }
+
+    RETURN_TYPES = ("CLARKAIR_VAE",)
+    FUNCTION = "load"
+    CATEGORY = "ClarkAir/Sana"
+    TITLE = "Clark Air DC-AE VAE Loader"
+
+    def load(self, vae_name):
+        from diffusers import AutoencoderDC
+
+        device = comfy.model_management.get_torch_device()
+        vae = AutoencoderDC.from_pretrained(vae_name, torch_dtype=torch.bfloat16).to(device).eval()
+        return (vae,)
+
+
+class ClarkAirVAEDecode:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"samples": ("LATENT",), "vae": ("CLARKAIR_VAE",)}}
+
+    RETURN_TYPES = ("IMAGE",)
+    FUNCTION = "decode"
+    CATEGORY = "ClarkAir/Sana"
+    TITLE = "Clark Air DC-AE VAE Decode"
+
+    def decode(self, samples, vae):
+        # ComfyUI's SanaLatent already divides the KSampler output by scale_factor, so decode
+        # the latent directly (matching ExtraModels' EXVAE); dividing again over-softens.
+        device = next(vae.parameters()).device
+        lat = samples["samples"].to(device=device, dtype=torch.bfloat16)
+        with torch.no_grad():
+            img = vae.decode(lat, return_dict=False)[0]
+        img = ((img.float() + 1.0) / 2.0).clamp(0, 1)
+        return (img.permute(0, 2, 3, 1).contiguous().cpu(),)
+
+
 NODE_CLASS_MAPPINGS = {
     "ClarkAirSanaLoader": ClarkAirSanaLoader,
     "ClarkAirSanaEmptyLatent": ClarkAirSanaEmptyLatent,
+    "ClarkAirGemmaLoader": ClarkAirGemmaLoader,
+    "ClarkAirGemmaEncode": ClarkAirGemmaEncode,
+    "ClarkAirVAELoader": ClarkAirVAELoader,
+    "ClarkAirVAEDecode": ClarkAirVAEDecode,
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "ClarkAirSanaLoader": "Clark Air Sana Loader (GemLite INT2)",
     "ClarkAirSanaEmptyLatent": "Clark Air Sana Empty Latent",
+    "ClarkAirGemmaLoader": "Clark Air Gemma Loader",
+    "ClarkAirGemmaEncode": "Clark Air Gemma Encode",
+    "ClarkAirVAELoader": "Clark Air DC-AE VAE Loader",
+    "ClarkAirVAEDecode": "Clark Air DC-AE VAE Decode",
 }

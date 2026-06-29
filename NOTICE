@@ -1,0 +1,9 @@
+ComfyUI-ClarkAirSana
+Copyright Clark Labs. Licensed under Apache-2.0.
+
+The Sana model implementation and ComfyUI integration under `sana/` are vendored from
+ComfyUI_ExtraModels (https://github.com/city96/ComfyUI_ExtraModels and the Sana fork
+https://github.com/lawrence-cj/ComfyUI_ExtraModels), licensed Apache-2.0, which itself
+adapts NVlabs/Sana (https://github.com/NVlabs/Sana), licensed Apache-2.0. Thanks to those
+authors. This package vendors that code only so it can run without an external custom-node
+dependency.

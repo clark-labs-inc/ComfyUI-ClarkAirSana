@@ -1,15 +1,15 @@
 {
   "1": {
-    "class_type": "GemmaLoader",
+    "class_type": "ClarkAirGemmaLoader",
     "inputs": { "model_name": "unsloth/gemma-2-2b-it-bnb-4bit", "device": "cuda", "dtype": "BF16" }
   },
   "2": {
-    "class_type": "GemmaTextEncode",
-    "inputs": { "text": "a corgi astronaut floating in space, photorealistic, 8k", "GEMMA": ["1", 0] }
+    "class_type": "ClarkAirGemmaEncode",
+    "inputs": { "text": "a corgi astronaut floating in space, photorealistic, 8k", "gemma": ["1", 0] }
   },
   "3": {
-    "class_type": "GemmaTextEncode",
-    "inputs": { "text": "", "GEMMA": ["1", 0] }
+    "class_type": "ClarkAirGemmaEncode",
+    "inputs": { "text": "", "gemma": ["1", 0] }
   },
   "4": {
     "class_type": "ClarkAirSanaLoader",
@@ -27,11 +27,11 @@
     }
   },
   "7": {
-    "class_type": "ExtraVAELoader",
-    "inputs": { "vae_name": "mit-han-lab/dc-ae-f32c32-sana-1.1-diffusers", "vae_type": "dcae-f32c32-sana-1.1-diffusers", "dtype": "BF16" }
+    "class_type": "ClarkAirVAELoader",
+    "inputs": { "vae_name": "mit-han-lab/dc-ae-f32c32-sana-1.1-diffusers" }
   },
   "8": {
-    "class_type": "VAEDecode",
+    "class_type": "ClarkAirVAEDecode",
     "inputs": { "samples": ["6", 0], "vae": ["7", 0] }
   },
   "9": {
