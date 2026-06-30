@@ -27,6 +27,16 @@ _TE_DTYPE = {"BF16": torch.bfloat16, "FP16": torch.float16, "FP32": torch.float3
 _MODEL_DTYPE = {"bfloat16": torch.bfloat16, "float16": torch.float16}
 
 
+def _from_pretrained(cls, name, **kwargs):
+    """Load from the local HF cache first — fully offline, no network HEAD check — and only
+    reach the network if the files aren't cached yet. Without this, `from_pretrained` validates
+    the cache against huggingface.co every run, which hangs when offline."""
+    try:
+        return cls.from_pretrained(name, local_files_only=True, **kwargs)
+    except Exception:
+        return cls.from_pretrained(name, **kwargs)
+
+
 # --------------------------------------------------------------------------- transformer
 class ClarkAirSanaLoader:
     @classmethod
@@ -107,9 +117,9 @@ class ClarkAirGemmaLoader:
         from transformers import AutoModelForCausalLM, AutoTokenizer
 
         td = _TE_DTYPE[dtype]
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = _from_pretrained(AutoTokenizer, model_name)
         tokenizer.padding_side = "right"
-        model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=td)
+        model = _from_pretrained(AutoModelForCausalLM, model_name, torch_dtype=td)
         text_encoder = model.get_decoder()
         if device != "cpu":
             text_encoder = text_encoder.to(device)
@@ -157,7 +167,7 @@ class ClarkAirVAELoader:
         from diffusers import AutoencoderDC
 
         device = comfy.model_management.get_torch_device()
-        vae = AutoencoderDC.from_pretrained(vae_name, torch_dtype=torch.bfloat16).to(device).eval()
+        vae = _from_pretrained(AutoencoderDC, vae_name, torch_dtype=torch.bfloat16).to(device).eval()
         return (vae,)
 
 

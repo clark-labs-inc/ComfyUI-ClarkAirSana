@@ -66,5 +66,8 @@ KSampler). `example_workflow_api.json` is the same graph in API format.
 - **Keep the transformer GPU-resident.** GemLite holds packed codes as buffers that ComfyUI's
   lowvram weight-streaming can't move; the loader pins the ~0.5 GB trunk on the GPU. Avoid
   `--lowvram` for it (Gemma/VAE are fine).
+- **Works offline.** Once the Gemma encoder and DC-AE VAE have been fetched once, the nodes load
+  them straight from the local cache with no network check, so a queue never stalls on
+  `huggingface.co` when you are offline.
 - The Sana model code under `sana/` is vendored from ComfyUI_ExtraModels (Apache-2.0), which adapts
   NVlabs/Sana — see `NOTICE`. This pack bundles it so it runs with no external node dependency.

@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-clarkairsana"
 description = "Run Clark Air Sana 1.6B (ternary ~1.58-bit, GemLite INT2 kernels) natively under ComfyUI's KSampler."
-version = "2.0.0"
+version = "2.0.1"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.10"
 dependencies = ["gemlite", "safetensors", "numpy"]
